@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw Implementation Plan — Sunil's Mac Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e17;
+    --bg-card: #111827;
+    --bg-card-hover: #1a2332;
+    --border: #1e293b;
+    --border-active: #f97316;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --accent-orange: #f97316;
+    --accent-green: #22c55e;
+    --accent-blue: #3b82f6;
+    --accent-purple: #a78bfa;
+    --accent-red: #ef4444;
+    --accent-cyan: #06b6d4;
+    --accent-yellow: #eab308;
+    --free: #22c55e;
+    --low: #3b82f6;
+    --medium: #f97316;
+    --high: #ef4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  .hero {
+    padding: 48px 32px 32px;
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .hero::before {
+    content: '🦞';
+    position: absolute;
+    top: 20px;
+    right: 40px;
+    font-size: 64px;
+    opacity: 0.15;
+  }
+
+  .hero-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent-orange);
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 400;
+    line-height: 1.15;
+    margin-bottom: 8px;
+  }
+
+  h1 em { font-style: italic; color: var(--accent-orange); }
+
+  .hero-sub {
+    color: var(--text-muted);
+    font-size: 16px;
+    max-width: 680px;
+    margin-bottom: 24px;
+  }
+
+  /* Subscription Banner */
+  .sub-banner {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+
+  .sub-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+  }
+
+  .sub-chip .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .sub-chip.owned .dot { background: var(--accent-green); }
+  .sub-chip.needed .dot { background: var(--accent-yellow); }
+
+  /* Tab Navigation */
+  .tab-nav {
+    display: flex;
+    gap: 4px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .tab-btn:hover { color: var(--text-muted); }
+  .tab-btn.active { color: var(--accent-orange); border-bottom-color: var(--accent-orange); }
+
+  /* Content Area */
+  .content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Section Headers */
+  .section-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 28px;
+    margin-bottom: 6px;
+  }
+
+  .section-desc {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  /* Cost Tier Badges */
+  .cost-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+
+  .cost-free { background: rgba(34,197,94,0.15); color: var(--free); }
+  .cost-low { background: rgba(59,130,246,0.15); color: var(--low); }
+  .cost-medium { background: rgba(249,115,22,0.15); color: var(--medium); }
+  .cost-high { background: rgba(239,68,68,0.15); color: var(--high); }
+
+  /* Phase Cards */
+  .phase-grid {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .phase-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+
+  .phase-card:hover { border-color: var(--border-active); }
+
+  .phase-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .phase-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-orange);
+    letter-spacing: 1px;
+  }
+
+  .phase-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .phase-when {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .phase-body {
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+
+  .phase-body p { margin-bottom: 8px; }
+
+  .detail-list {
+    list-style: none;
+    margin-top: 12px;
+  }
+
+  .detail-list li {
+    position: relative;
+    padding-left: 18px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .detail-list li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--accent-orange);
+    font-weight: 700;
+  }
+
+  /* Config Block */
+  .config-block {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 12px 0;
+    overflow-x: auto;
+  }
+
+  .config-block pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-muted);
+  }
+
+  .config-block .comment { color: var(--text-dim); }
+  .config-block .key { color: var(--accent-cyan); }
+  .config-block .val { color: var(--accent-green); }
+  .config-block .label { color: var(--accent-orange); }
+
+  /* Cost Table */
+  .cost-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+
+  .cost-table th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cost-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(30,41,59,0.5);
+    color: var(--text-muted);
+  }
+
+  .cost-table tr:hover td { background: rgba(249,115,22,0.03); }
+
+  /* SOUL.md Template */
+  .soul-template {
+    background: linear-gradient(135deg, #111827 0%, #1a1a2e 100%);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 16px 0;
+  }
+
+  .soul-template h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--accent-orange);
+    margin-bottom: 16px;
+  }
+
+  .soul-section {
+    margin-bottom: 16px;
+  }
+
+  .soul-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .soul-section p {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* Use Case Cards */
+  .usecase-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .usecase-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.2s;
+  }
+
+  .usecase-card:hover {
+    border-color: var(--border-active);
+    transform: translateY(-2px);
+  }
+
+  .usecase-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .usecase-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .usecase-stack {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-purple);
+    margin-bottom: 8px;
+  }
+
+  .usecase-body {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .usecase-meta {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .meta-item {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+  }
+
+  /* Model Routing Diagram */
+  .routing-diagram {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .routing-tier {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .routing-tier.tier-1 { border-top: 3px solid var(--accent-orange); }
+  .routing-tier.tier-2 { border-top: 3px solid var(--accent-blue); }
+  .routing-tier.tier-3 { border-top: 3px solid var(--accent-green); }
+
+  .tier-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .tier-1 .tier-label { color: var(--accent-orange); }
+  .tier-2 .tier-label { color: var(--accent-blue); }
+  .tier-3 .tier-label { color: var(--accent-green); }
+
+  .tier-model {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .tier-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 8px 0;
+  }
+
+  .tier-1 .tier-pct { color: var(--accent-orange); }
+  .tier-2 .tier-pct { color: var(--accent-blue); }
+  .tier-3 .tier-pct { color: var(--accent-green); }
+
+  .tier-cost {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .tier-tasks {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    text-align: left;
+    line-height: 1.8;
+  }
+
+  /* Warning Box */
+  .warning-box {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: #fca5a5;
+  }
+
+  .warning-box strong { color: var(--accent-red); }
+
+  .tip-box {
+    background: rgba(34,197,94,0.08);
+    border: 1px solid rgba(34,197,94,0.2);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: #86efac;
+  }
+
+  .tip-box strong { color: var(--accent-green); }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero, .content { padding: 24px 16px; }
+    .tab-nav { padding: 0 16px; }
+    .routing-diagram { grid-template-columns: 1fr; }
+    .usecase-grid { grid-template-columns: 1fr; }
+    .sub-banner { flex-direction: column; }
+  }
+
+  /* Smooth scroll */
+  html { scroll-behavior: smooth; }
+
+  .monthly-total {
+    background: linear-gradient(135deg, rgba(249,115,22,0.1), rgba(59,130,246,0.1));
+    border: 1px solid var(--accent-orange);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    margin: 24px 0;
+  }
+
+  .monthly-total .amount {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--accent-orange);
+  }
+
+  .monthly-total .label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .expandable-detail {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+
+  .phase-card.expanded .expandable-detail {
+    max-height: 2000px;
+  }
+
+  .expand-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-label">OpenClaw × Mac Studio × Your Stack</div>
+  <h1>Implementation Plan &<br><em>Cost-Optimized Roadmap</em></h1>
+  <p class="hero-sub">
+    A phased plan to leverage OpenClaw with your existing subscriptions — Claude Code Pro, Gemini Pro, Educative.io — 
+    minimizing additional API spend while maximizing business and productivity outcomes.
+  </p>
+
+  <div class="sub-banner">
+    <div class="sub-chip owned"><span class="dot"></span>Claude Code Pro — $20/mo (owned)</div>
+    <div class="sub-chip owned"><span class="dot"></span>Gemini Pro — yearly (owned)</div>
+    <div class="sub-chip owned"><span class="dot"></span>Educative.io Premium+ (owned)</div>
+    <div class="sub-chip owned"><span class="dot"></span>Mac Studio — M4 hardware (owned)</div>
+    <div class="sub-chip needed"><span class="dot"></span>Anthropic API Key — ~$10-30/mo (needed)</div>
+    <div class="sub-chip needed"><span class="dot"></span>Google AI Studio Key — FREE (needed)</div>
+  </div>
+</div>
+
+<nav class="tab-nav">
+  <button class="tab-btn active" data-tab="cost">💰 Cost Strategy</button>
+  <button class="tab-btn" data-tab="setup">⚙️ Setup Plan</button>
+  <button class="tab-btn" data-tab="usecases">🚀 Use Cases</button>
+  <button class="tab-btn" data-tab="soul">📋 SOUL.md</button>
+  <button class="tab-btn" data-tab="security">🔒 Security</button>
+</nav>
+
+<div class="content">
+
+  <!-- COST TAB -->
+  <div class="tab-panel active" id="tab-cost">
+    <div class="section-title">Cost Optimization Strategy</div>
+    <div class="section-desc">Maximize what you already pay for. Minimize new API spend with 3-tier model routing.</div>
+
+    <div class="tip-box">
+      <strong>Key Insight:</strong> Your Claude Code Pro subscription <em>cannot</em> be used with OpenClaw — Anthropic cut off third-party tool access on April 4, 2026. 
+      However, Claude Code CLI itself remains a powerful tool that OpenClaw can <em>invoke via bash</em>. Your Gemini Pro subscription 
+      gives you access to Google AI Studio API keys with generous free-tier limits.
+    </div>
+
+    <div class="section-title" style="font-size:22px; margin-top:32px;">3-Tier Model Routing</div>
+    <div class="section-desc">Route tasks by complexity — 80% of requests go to free/cheap models.</div>
+
+    <div class="routing-diagram">
+      <div class="routing-tier tier-1">
+        <div class="tier-label">TIER 1 — FRONTIER</div>
+        <div class="tier-model">Claude Sonnet 4.6</div>
+        <div class="tier-pct">15%</div>
+        <div class="tier-cost">$3/$15 per M tokens</div>
+        <div class="tier-tasks">
+          Complex code generation<br>
+          Architecture reviews<br>
+          Multi-file refactoring<br>
+          Interview prep synthesis
+        </div>
+      </div>
+      <div class="routing-tier tier-2">
+        <div class="tier-label">TIER 2 — BALANCED</div>
+        <div class="tier-model">Gemini 3 Flash</div>
+        <div class="tier-pct">55%</div>
+        <div class="tier-cost">$0.50/$3 per M tokens</div>
+        <div class="tier-tasks">
+          Daily coding tasks<br>
+          Content drafting<br>
+          Email analysis<br>
+          Research summaries
+        </div>
+      </div>
+      <div class="routing-tier tier-3">
+        <div class="tier-label">TIER 3 — FREE/LOCAL</div>
+        <div class="tier-model">Gemini 2.0 Flash / Ollama</div>
+        <div class="tier-pct">30%</div>
+        <div class="tier-cost">FREE</div>
+        <div class="tier-tasks">
+          Heartbeat checks<br>
+          Cron job status<br>
+          Simple Q&A<br>
+          File reads & routing
+        </div>
+      </div>
+    </div>
+
+    <div class="monthly-total">
+      <div class="amount">$15–35/mo</div>
+      <div class="label">Estimated Additional API Cost (on top of your existing subscriptions)</div>
+    </div>
+
+    <div class="section-title" style="font-size:22px; margin-top:32px;">Cost Breakdown by Resource</div>
+
+    <table class="cost-table">
+      <thead>
+        <tr>
+          <th>Resource</th>
+          <th>What You Have</th>
+          <th>OpenClaw Usage</th>
+          <th>Extra Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Claude Code Pro</strong></td>
+          <td>$20/mo subscription</td>
+          <td>Use CLI via bash for heavy lifting — OpenClaw delegates complex coding to Claude Code as a subprocess</td>
+          <td><span class="cost-badge cost-free">$0</span></td>
+        </tr>
+        <tr>
+          <td><strong>Gemini Pro</strong></td>
+          <td>Yearly subscription</td>
+          <td>Google AI Studio API key — free tier gives 1,000 req/day with Gemini 2.0 Flash. Use Gemini 3 Flash at $0.50/M input for Tier 2</td>
+          <td><span class="cost-badge cost-low">$5-15/mo</span></td>
+        </tr>
+        <tr>
+          <td><strong>Anthropic API</strong></td>
+          <td>Need to purchase</td>
+          <td>Claude Sonnet 4.6 for Tier 1 tasks only (~15% of requests). Use prompt caching for 90% savings on repeated context</td>
+          <td><span class="cost-badge cost-low">$10-20/mo</span></td>
+        </tr>
+        <tr>
+          <td><strong>Ollama (Local)</strong></td>
+          <td>Mac Studio M4 hardware</td>
+          <td>Qwen3 32B or Llama 3.3 for Tier 3 tasks — runs locally, zero API cost. Your Mac Studio handles this easily</td>
+          <td><span class="cost-badge cost-free">$0</span></td>
+        </tr>
+        <tr>
+          <td><strong>Educative.io</strong></td>
+          <td>Premium+ yearly</td>
+          <td>Not directly used by OpenClaw, but you can have OpenClaw scrape your learning progress and create daily study plans</td>
+          <td><span class="cost-badge cost-free">$0</span></td>
+        </tr>
+        <tr>
+          <td><strong>Hosting</strong></td>
+          <td>Mac Studio = local</td>
+          <td>Run OpenClaw gateway locally — no VPS needed. Always-on as long as Mac Studio is on</td>
+          <td><span class="cost-badge cost-free">$0</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="tip-box" style="margin-top:24px;">
+      <strong>The Claude Code CLI Trick:</strong> Instead of paying Anthropic API directly for complex tasks, 
+      OpenClaw can call <code>claude code</code> via bash as a subprocess. This uses your existing Pro subscription credits. 
+      The OpenClaw community calls this the "bash delegation" pattern — Gemini handles orchestration, Claude Code handles the heavy coding.
+    </div>
+
+    <div class="config-block">
+      <pre><span class="comment">// ~/.openclaw/openclaw.json — 3-tier model routing config</span>
+{
+  <span class="key">"models"</span>: {
+    <span class="key">"providers"</span>: {
+      <span class="key">"anthropic"</span>: {
+        <span class="key">"apiKey"</span>: <span class="val">"$ANTHROPIC_API_KEY"</span>,  <span class="comment">// env var, never hardcode</span>
+        <span class="key">"models"</span>: [{ <span class="key">"id"</span>: <span class="val">"claude-sonnet-4-6"</span> }]
+      },
+      <span class="key">"google"</span>: {
+        <span class="key">"apiKey"</span>: <span class="val">"$GEMINI_API_KEY"</span>,
+        <span class="key">"models"</span>: [
+          { <span class="key">"id"</span>: <span class="val">"gemini-3-flash"</span> },
+          { <span class="key">"id"</span>: <span class="val">"gemini-2.0-flash"</span> }
+        ]
+      },
+      <span class="key">"ollama"</span>: {
+        <span class="key">"baseUrl"</span>: <span class="val">"http://localhost:11434/v1"</span>,
+        <span class="key">"models"</span>: [{ <span class="key">"id"</span>: <span class="val">"qwen3:32b"</span> }]
+      }
+    }
+  },
+  <span class="key">"agents"</span>: {
+    <span class="key">"defaults"</span>: {
+      <span class="key">"model"</span>: {
+        <span class="key">"primary"</span>: <span class="val">"google/gemini-3-flash"</span>,      <span class="comment">// daily driver</span>
+        <span class="key">"thinking"</span>: <span class="val">"anthropic/claude-sonnet-4-6"</span>, <span class="comment">// complex tasks</span>
+        <span class="key">"fallback"</span>: <span class="val">"ollama/qwen3:32b"</span>           <span class="comment">// free local</span>
+      }
+    }
+  }
+}</pre>
+    </div>
+  </div>
+
+  <!-- SETUP TAB -->
+  <div class="tab-panel" id="tab-setup">
+    <div class="section-title">4-Week Setup Plan</div>
+    <div class="section-desc">Click any phase card to expand details. Ordered by impact and aligned with your April 21 deadline.</div>
+
+    <div class="phase-grid">
+      <div class="phase-card" onclick="this.classList.toggle('expanded')">
+        <div class="phase-header">
+          <div>
+            <div class="phase-num">PHASE 01</div>
+            <div class="phase-title">Foundation — Install & Connect</div>
+            <div class="phase-when">Days 1–3 · Cost: $0</div>
+          </div>
+          <span class="cost-badge cost-free">FREE</span>
+        </div>
+        <div class="phase-body">
+          <p>Get OpenClaw running on Mac Studio with Gemini free tier + local Ollama. Zero API cost while you learn the system.</p>
+        </div>
+        <div class="expand-hint">▸ click to expand</div>
+        <div class="expandable-detail">
+          <ul class="detail-list">
+            <li>Install Node.js 24 via nvm — <code>nvm install 24</code></li>
+            <li>Install OpenClaw — <code>npm install -g openclaw@latest && openclaw onboard --install-daemon</code></li>
+            <li>Install Ollama — <code>curl -fsSL https://ollama.com/install.sh | sh && ollama pull qwen3:32b</code></li>
+            <li>Get Google AI Studio API key from aistudio.google.com (free)</li>
+            <li>Set up Telegram bot via @BotFather — your primary chat interface</li>
+            <li>Write initial SOUL.md (see SOUL.md tab for your template)</li>
+            <li>Run inside Docker Desktop for security sandboxing</li>
+            <li>Test with simple tasks: "What time is it?", "List files in ~/projects"</li>
+          </ul>
+          <div class="warning-box" style="margin-top:12px;">
+            <strong>Security First:</strong> Bind Canvas Host to 127.0.0.1 (not default 0.0.0.0). 
+            Never run as root. Create a dedicated macOS user for OpenClaw.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-card" onclick="this.classList.toggle('expanded')">
+        <div class="phase-header">
+          <div>
+            <div class="phase-num">PHASE 02</div>
+            <div class="phase-title">Interview Prep Agent</div>
+            <div class="phase-when">Days 4–7 · Cost: $0–5</div>
+          </div>
+          <span class="cost-badge cost-low">~$5</span>
+        </div>
+        <div class="phase-body">
+          <p>Build an always-on interview prep assistant that pulls arXiv papers, scans Hacker News, and quizzes you daily — critical for your April 21 deadline.</p>
+        </div>
+        <div class="expand-hint">▸ click to expand</div>
+        <div class="expandable-detail">
+          <ul class="detail-list">
+            <li>Install Exa Search skill for technical documentation lookup</li>
+            <li>Set up cron: "Every morning at 6:30 AM, summarize 3 latest papers on RAG, MCP, Vertex AI from arXiv"</li>
+            <li>Feed your Master Interview Reference HTML into OpenClaw's MEMORY.md</li>
+            <li>Daily quiz mode: "Ask me 5 system design questions about Kafka exactly-once semantics and rate my answers"</li>
+            <li>Auto-generate flashcards from your Educative.io study sessions</li>
+            <li>Track prep progress in local markdown files</li>
+          </ul>
+          <div class="config-block">
+            <pre><span class="comment">// SOUL.md addition for interview prep agent</span>
+<span class="label">## Interview Prep Mode</span>
+When I say "quiz me", ask 5 system design questions from:
+- Kafka (exactly-once, consumer groups, partitioning)
+- Spring Boot (auto-config internals, reactive WebFlux)
+- Event Sourcing vs CQRS trade-offs
+- GCP (Pub/Sub, Cloud Run, Vertex AI)
+Rate my answer 1-10 and provide the "production reality" 
+follow-up an interviewer would ask.
+Keep the articulation framework: Hook → Trade-off → 
+Production Reality → Forward Thinking.</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-card" onclick="this.classList.toggle('expanded')">
+        <div class="phase-header">
+          <div>
+            <div class="phase-num">PHASE 03</div>
+            <div class="phase-title">Morning Briefing + Email Triage</div>
+            <div class="phase-when">Week 2 · Cost: $0</div>
+          </div>
+          <span class="cost-badge cost-free">FREE (Gemini)</span>
+        </div>
+        <div class="phase-body">
+          <p>Daily automated briefing via Telegram — calendar, email priorities, HCL redeployment updates, and task list. Uses Gemini free tier only.</p>
+        </div>
+        <div class="expand-hint">▸ click to expand</div>
+        <div class="expandable-detail">
+          <ul class="detail-list">
+            <li>Connect Google Calendar skill for daily schedule scan</li>
+            <li>Connect Gmail skill for email triage (read-only first!)</li>
+            <li>Cron: 6:30 AM — weather in San Antonio, top 3 calendar events, unread email priorities, HCL portal check reminders</li>
+            <li>Add HN/Reddit monitoring for AI architect job postings</li>
+            <li>Weekly summary: "What did I accomplish this week? What's pending?"</li>
+          </ul>
+          <div class="tip-box">
+            <strong>Zero Cost:</strong> Morning briefings use Gemini 2.0 Flash free tier — simple summarization and Q&A. 
+            1,000 free requests/day is more than enough for personal automation.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-card" onclick="this.classList.toggle('expanded')">
+        <div class="phase-header">
+          <div>
+            <div class="phase-num">PHASE 04</div>
+            <div class="phase-title">Development Accelerator</div>
+            <div class="phase-when">Week 3 · Cost: $10-20</div>
+          </div>
+          <span class="cost-badge cost-low">~$15</span>
+        </div>
+        <div class="phase-body">
+          <p>Point OpenClaw at your Spring Boot / React / Kafka projects. Scaffold microservices, generate boilerplate, run tests — delegates heavy coding to Claude Code CLI.</p>
+        </div>
+        <div class="expand-hint">▸ click to expand</div>
+        <div class="expandable-detail">
+          <ul class="detail-list">
+            <li>Install GitHub integration skill for repo management</li>
+            <li>Configure "bash delegation" — OpenClaw routes complex coding to Claude Code CLI</li>
+            <li>"Scaffold a Spring Boot 3.3 microservice with Kafka consumer, MongoDB repository, and WebFlux endpoints"</li>
+            <li>"Generate a React component with TypeScript for the document viewer with drag-and-drop"</li>
+            <li>"Read my Papa John's Unified Commerce codebase and generate architecture documentation"</li>
+            <li>Auto-run tests after code generation, fix failures autonomously</li>
+          </ul>
+          <div class="config-block">
+            <pre><span class="comment">// Claude Code bash delegation pattern</span>
+<span class="comment">// In SOUL.md:</span>
+<span class="label">## Code Generation</span>
+For complex coding tasks (multi-file refactoring, new 
+microservice scaffolding, architecture reviews):
+1. Plan the approach with your own reasoning
+2. Execute via: <span class="val">claude -p "task description" --output-format json</span>
+3. Review the output and iterate if needed
+This uses my Claude Code Pro subscription at $0 extra cost.</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-card" onclick="this.classList.toggle('expanded')">
+        <div class="phase-header">
+          <div>
+            <div class="phase-num">PHASE 05</div>
+            <div class="phase-title">SaaS Validation Pipeline</div>
+            <div class="phase-when">Week 4+ · Cost: $10-15</div>
+          </div>
+          <span class="cost-badge cost-medium">~$12</span>
+        </div>
+        <div class="phase-body">
+          <p>Automated market research → gap analysis → MVP scaffolding pipeline. Find real pain points and build solutions with your Java/React stack.</p>
+        </div>
+        <div class="expand-hint">▸ click to expand</div>
+        <div class="expandable-detail">
+          <ul class="detail-list">
+            <li>Install Reddit/X monitoring skills — mine r/java, r/devops, r/springboot for pain points</li>
+            <li>"Scan Product Hunt and GitHub for Spring Boot + AI tools. What gaps exist?"</li>
+            <li>Auto-validate ideas: "Check if there's a Spring Boot MCP server generator on npm/Maven — if not, draft a PRD"</li>
+            <li>Content pipeline: blog post → LinkedIn → Medium → Substack adaptation</li>
+            <li>Lead gen: monitor HN "Ask HN" for enterprise Java/GCP consulting opportunities</li>
+            <li>Build a "Spring Boot + Vertex AI Starter Kit" SaaS — scaffold with OpenClaw</li>
+          </ul>
+          <div class="tip-box">
+            <strong>SaaS Ideas Matching Your Stack:</strong><br>
+            ① Spring Boot MCP Server generator (no good one exists in Java ecosystem)<br>
+            ② Enterprise Kafka-to-RAG pipeline tool (your USAA/PJ's experience)<br>
+            ③ AI-powered API migration assistant (Strangler Fig automation)<br>
+            ④ Interactive system design interview prep platform (your exact prep materials, productized)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- USE CASES TAB -->
+  <div class="tab-panel" id="tab-usecases">
+    <div class="section-title">Use Cases Ranked by Your Stack</div>
+    <div class="section-desc">Prioritized by ROI, effort, and alignment with Java/Spring Boot/GCP/Kafka/React/MongoDB expertise.</div>
+
+    <div class="usecase-grid">
+      <div class="usecase-card">
+        <div class="usecase-icon">🎯</div>
+        <div class="usecase-title">Interview Prep Autopilot</div>
+        <div class="usecase-stack">Gemini Flash + Ollama · CRON + Telegram</div>
+        <div class="usecase-body">
+          Daily mock interview questions on Kafka, Spring Boot internals, system design. 
+          Auto-generates follow-up Q&A in your articulation framework. 
+          Tracks weak areas and focuses on them.
+        </div>
+        <div class="usecase-meta">
+          <span class="cost-badge cost-free">FREE</span>
+          <span class="meta-item">⏱ 30 min setup</span>
+          <span class="meta-item">🎯 CRITICAL for April 21</span>
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <div class="usecase-icon">☕</div>
+        <div class="usecase-title">Morning Briefing Agent</div>
+        <div class="usecase-stack">Gemini 2.0 Flash free tier · Calendar + Gmail</div>
+        <div class="usecase-body">
+          6:30 AM daily: weather San Antonio, calendar, email priority, HCL redeployment portal status, 
+          interview schedule, top 3 tasks. Delivered to Telegram.
+        </div>
+        <div class="usecase-meta">
+          <span class="cost-badge cost-free">FREE</span>
+          <span class="meta-item">⏱ 30 min setup</span>
+          <span class="meta-item">📈 Daily ROI</span>
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <div class="usecase-icon">🏗️</div>
+        <div class="usecase-title">Spring Boot Microservice Generator</div>
+        <div class="usecase-stack">Claude Code CLI + Gemini · Java 21 + Spring Boot 3.3</div>
+        <div class="usecase-body">
+          "Scaffold a microservice with Kafka consumer, MongoDB repo, WebFlux controllers, 
+          Docker Compose, and Testcontainers." Delegates to Claude Code via bash.
+        </div>
+        <div class="usecase-meta">
+          <span class="cost-badge cost-free">$0 (uses Claude Code Pro)</span>
+          <span class="meta-item">⏱ 1 hr setup</span>
+          <span class="meta-item">💰 SaaS potential</span>
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <div class="usecase-icon">📝</div>
+        <div class="usecase-title">Content Marketing Engine</div>
+        <div class="usecase-stack">Gemini 3 Flash · Hashnode + Medium + LinkedIn</div>
+        <div class="usecase-body">
+          Write one technical blog post → OpenClaw adapts for Hashnode (SEO), 
+          Medium (story), LinkedIn (short), Substack (newsletter), Dev.to (tutorial).
+        </div>
+        <div class="usecase-meta">
+          <span class="cost-badge cost-low">~$3/mo</span>
+          <span class="meta-item">⏱ 1 hr setup</span>
+          <span class="meta-item">📈 Brand building</span>
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <div class="usecase-icon">🔍</div>
+        <div class="usecase-title">SaaS Idea Validator</div>
+        <div class="usecase-stack">Gemini Flash + Exa Search · Reddit + ProductHunt</div>
+        <div class="usecase-body">
+          Monitors Reddit/HN for enterprise Java pain points. Validates market gaps. 
+          Checks if solutions exist on GitHub/npm/Maven. Drafts PRD if gap found.
+        </div>
+        <div class="usecase-meta">
+          <span class="cost-badge cost-low">~$5/mo</span>
+          <span class="meta-item">⏱ 2 hr setup</span>
+          <span class="meta-item">💰 Business critical</span>
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <div class="usecase-icon">🧠</div>
+        <div class="usecase-title">arXiv Research Digest</div>
+        <div class="usecase-stack">Gemini 2.0 Flash free · arXiv skill</div>
+        <div class="usecase-body">
+          Daily scan of arXiv for RAG, MCP, Vertex AI, agentic AI papers. 
+          Summarize key findings and map to your 6-week learning plan progress.
+        </div>
+        <div class="usecase-meta">
+          <span class="cost-badge cost-free">FREE</span>
+          <span class="meta-item">⏱ 20 min setup</span>
+          <span class="meta-item">🎓 Learning accelerator</span>
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <div class="usecase-icon">👨‍👩‍👧</div>
+        <div class="usecase-title">Aanya's Quiz Generator</div>
+        <div class="usecase-stack">Ollama Qwen3 · Local · Zero cost</div>
+        <div class="usecase-body">
+          Generate daily 4th-grade math, science, and logical reasoning quizzes. 
+          Runs entirely on local Ollama — completely free, completely private.
+        </div>
+        <div class="usecase-meta">
+          <span class="cost-badge cost-free">FREE</span>
+          <span class="meta-item">⏱ 15 min setup</span>
+          <span class="meta-item">👨‍👧 Family value</span>
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <div class="usecase-icon">📊</div>
+        <div class="usecase-title">OpenClaw Skills Builder (Sell)</div>
+        <div class="usecase-stack">Java/Spring Boot · ClawHub marketplace</div>
+        <div class="usecase-body">
+          Build enterprise-grade OpenClaw skills — Kafka connector, Spring Boot deployer, 
+          MongoDB aggregation pipeline builder. Publish to ClawHub. Monetize through consulting.
+        </div>
+        <div class="usecase-meta">
+          <span class="cost-badge cost-free">$0 to build</span>
+          <span class="meta-item">⏱ Ongoing</span>
+          <span class="meta-item">💰 Revenue stream</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOUL.MD TAB -->
+  <div class="tab-panel" id="tab-soul">
+    <div class="section-title">Your SOUL.md Template</div>
+    <div class="section-desc">This is the instruction file that defines your OpenClaw agent's personality, capabilities, and hard limits. Copy this as your starting point.</div>
+
+    <div class="soul-template">
+      <h3>📋 SOUL.md — Sunil's Enterprise Architect Agent</h3>
+
+      <div class="soul-section">
+        <div class="soul-section-title"># IDENTITY</div>
+        <p>You are Sunil's personal AI architect assistant. You understand enterprise Java 
+        (20+ years), Spring Boot microservices, GCP, Kafka, MongoDB, React, and AWS. 
+        You think at the solution architect level — trade-offs, scaling numbers, latency 
+        considerations, and production-grade patterns.</p>
+      </div>
+
+      <div class="soul-section">
+        <div class="soul-section-title"># TECH STACK CONTEXT</div>
+        <p>Primary: Java 21 + Spring Boot 3.3 + GCP + Kafka + MongoDB + React 18<br>
+        Secondary: AWS, Python (for ML pipelines), Vertex AI<br>
+        Current project: USAA document generation platform (Kafka pipelines, Spring Batch)<br>
+        Past: Papa John's Unified Commerce API (5,000+ stores, Saga orchestration, CQRS, WebFlux)</p>
+      </div>
+
+      <div class="soul-section">
+        <div class="soul-section-title"># CODE GENERATION RULES</div>
+        <p>For complex coding tasks (multi-file, architecture, refactoring):<br>
+        → Delegate to Claude Code CLI: <code>claude -p "[task]" --output-format json</code><br>
+        For simple file edits, scripts, and quick fixes:<br>
+        → Handle directly using your own capabilities<br>
+        Always use Java 21 features (virtual threads, pattern matching, records) unless told otherwise.</p>
+      </div>
+
+      <div class="soul-section">
+        <div class="soul-section-title"># INTERVIEW PREP MODE</div>
+        <p>When I say "quiz me" or "interview mode":<br>
+        → Ask system design questions using the articulation framework:<br>
+        → Hook (why you chose) → Trade-off (what you gained/lost) → Production Reality (what happened at scale) → Forward Thinking (what you'd change)<br>
+        → Focus on: Kafka, Spring Boot internals, Event Sourcing, CQRS, Saga, Strangler Fig, GCP, Vertex AI, MCP<br>
+        → Rate my answers 1-10 and give the follow-up an interviewer would ask</p>
+      </div>
+
+      <div class="soul-section">
+        <div class="soul-section-title"># HARD LIMITS — NEVER DO THESE</div>
+        <p>❌ Never send an email without showing me the draft and getting "yes"<br>
+        ❌ Never delete files without explicit confirmation<br>
+        ❌ Never execute financial transactions<br>
+        ❌ Never share API keys or credentials in any message<br>
+        ❌ Never access files outside ~/projects and ~/openclaw-workspace<br>
+        ❌ Never make network requests to unknown domains<br>
+        ❌ Never commit code to git without my approval</p>
+      </div>
+
+      <div class="soul-section">
+        <div class="soul-section-title"># MORNING BRIEFING (CRON: 6:30 AM CT)</div>
+        <p>Every day at 6:30 AM, send to Telegram:<br>
+        → Weather in San Antonio<br>
+        → Top 3 calendar events with context<br>
+        → Unread email priority summary (max 5)<br>
+        → My #1 priority task for today<br>
+        → One interview prep question to think about<br>
+        Keep it under 200 words.</p>
+      </div>
+
+      <div class="soul-section">
+        <div class="soul-section-title"># MODEL ROUTING PREFERENCES</div>
+        <p>Simple tasks (status checks, reminders, file reads) → Ollama/qwen3:32b (free, local)<br>
+        Standard tasks (coding, content, research) → Gemini 3 Flash ($0.50/M)<br>
+        Complex tasks (architecture, multi-file code gen, reasoning) → Claude Sonnet 4.6 ($3/$15/M)<br>
+        Heavy coding delegation → Claude Code CLI via bash ($0 — uses Pro subscription)</p>
+      </div>
+    </div>
+
+    <div class="tip-box" style="margin-top: 16px;">
+      <strong>Pro Tip:</strong> Start with read-only permissions for calendar and email. 
+      Only grant write access after 1-2 weeks of stable operation. 
+      Add capabilities incrementally, not all at once.
+    </div>
+  </div>
+
+  <!-- SECURITY TAB -->
+  <div class="tab-panel" id="tab-security">
+    <div class="section-title">Security Hardening Checklist</div>
+    <div class="section-desc">OpenClaw has had 9+ CVEs and 42,665 exposed instances in its first 2 months. Don't be one of them.</div>
+
+    <div class="warning-box">
+      <strong>⚠️ Critical:</strong> OpenClaw's Canvas Host defaults to binding 0.0.0.0, meaning any device on your local network 
+      can reach your interface. This is tracked as GitHub Issue #5263 and was closed as "not planned." You must fix it manually.
+    </div>
+
+    <div class="phase-grid">
+      <div class="phase-card">
+        <div class="phase-title">1. Run in Docker (Non-Negotiable)</div>
+        <div class="phase-body">
+          <ul class="detail-list">
+            <li>Containerize OpenClaw with restricted volume mounts</li>
+            <li>Only mount ~/projects and ~/openclaw-workspace — never /</li>
+            <li>Use Docker's network isolation to control outbound traffic</li>
+            <li>Consider NemoClaw (Nvidia's security add-on) for OpenShell sandboxing</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase-card">
+        <div class="phase-title">2. API Key Management</div>
+        <div class="phase-body">
+          <ul class="detail-list">
+            <li>Never hardcode keys in openclaw.json — use environment variables</li>
+            <li>Set spending limits on Anthropic console ($30/mo cap to start)</li>
+            <li>Use a dedicated Google account for Gemini API — not your primary Gmail</li>
+            <li>Rotate API keys monthly</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase-card">
+        <div class="phase-title">3. Network & Access Control</div>
+        <div class="phase-body">
+          <ul class="detail-list">
+            <li>Bind Canvas Host to 127.0.0.1 — not 0.0.0.0</li>
+            <li>Never run OpenClaw as root — create a dedicated macOS user</li>
+            <li>Use file allowlists in SOUL.md to restrict directory access</li>
+            <li>Monitor logs: <code>tail -f ~/.openclaw/logs/gateway.log</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase-card">
+        <div class="phase-title">4. Skill Vetting</div>
+        <div class="phase-body">
+          <ul class="detail-list">
+            <li>Only install skills from the official ClawHub registry</li>
+            <li>Review source code before installing any community skill</li>
+            <li>Cisco found data exfiltration in unvetted third-party skills</li>
+            <li>Start with 5-6 core skills, expand only after verification</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip-box" style="margin-top:16px;">
+      <strong>Minimum Safe Skills to Start:</strong> Calendar (read-only), Gmail (read-only), 
+      Exa Search, GitHub (read-only), Telegram Bot. Add write permissions only after 2 weeks of stable operation.
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

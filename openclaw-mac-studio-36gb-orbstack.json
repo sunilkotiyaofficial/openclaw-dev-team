@@ -1,0 +1,273 @@
+{
+  "_comment": "Sunil's Multi-Agent Dev Team - ORBSTACK OPTIMIZED - Mac Studio 36GB",
+  "_description": "Optimized for OrbStack container runtime instead of Docker Desktop. Better performance, lower memory, native ARM support.",
+  "_cost_strategy": "Tier-routed: Gemini Flash primary, Claude Sonnet for complex, Ollama local (Gemma 4 26B) for QA",
+  "_runtime": "OrbStack (recommended for Mac Studio Apple Silicon)",
+  "_last_updated": "2026-04-11",
+
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 18789,
+    "logLevel": "info",
+    "contextPruning": {
+      "enabled": true,
+      "interval": "30m"
+    }
+  },
+
+  "models": {
+    "providers": {
+      "anthropic": {
+        "apiKey": "$ANTHROPIC_API_KEY",
+        "rateLimit": {
+          "tokensPerDay": 500000,
+          "requestsPerMin": 60
+        },
+        "models": [
+          { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "priority": 1 },
+          { "id": "claude-haiku-4-5", "name": "Claude Haiku 4.5", "priority": 2 }
+        ]
+      },
+      "google": {
+        "apiKey": "$GEMINI_API_KEY",
+        "rateLimit": {
+          "tokensPerDay": 1000000,
+          "requestsPerMin": 100
+        },
+        "models": [
+          { "id": "gemini-3-flash", "name": "Gemini 3 Flash", "priority": 1 },
+          { "id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash (Free Tier)", "priority": 2 },
+          { "id": "gemini-3-pro", "name": "Gemini 3 Pro", "priority": 3 }
+        ]
+      },
+      "ollama": {
+        "baseUrl": "http://localhost:11434/v1",
+        "api": "openai-completions",
+        "healthCheckInterval": "5m",
+        "models": [
+          { "id": "gemma4:26b", "name": "Gemma 4 26B (local)", "quantization": "Q4_0", "memory": "16GB" },
+          { "id": "llama2:7b", "name": "Llama 2 7B (fallback)", "quantization": "Q4_0", "memory": "7GB" }
+        ]
+      }
+    }
+  },
+
+  "agents": {
+    "defaults": {
+      "contextPruning": {
+        "mode": "cache-ttl",
+        "ttl": "30m",
+        "softTrim": { "maxChars": 12000, "headChars": 3000, "tailChars": 1500 },
+        "hardClear": { "enabled": true, "placeholder": "[context truncated]" }
+      },
+      "compaction": {
+        "mode": "safeguard",
+        "maxHistoryShare": 0.6,
+        "reserveTokens": 12000,
+        "keepRecentTokens": 5000
+      }
+    },
+
+    "list": [
+      {
+        "id": "orchestrator",
+        "default": true,
+        "name": "🧠 Orchestrator",
+        "emoji": "🧠",
+        "role": "Project manager, delegates tasks, never codes directly",
+        "workspace": "~/.openclaw/workspace-orchestrator",
+        "agentDir": "~/.openclaw/agents/orchestrator/agent",
+        "model": "google/gemini-3-flash",
+        "thinking": "anthropic/claude-sonnet-4-6",
+        "resourceLimits": {
+          "memory": "2GB",
+          "cpu": "2",
+          "maxConcurrentTasks": 5
+        },
+        "tools": {
+          "allow": ["read", "exec", "spawn_subagent", "agent_to_agent"],
+          "deny": ["write", "edit", "apply_patch"]
+        },
+        "skills": ["github", "calendar", "telegram", "sub-agents", "exa-search"]
+      },
+      {
+        "id": "backend",
+        "name": "☕ Backend Dev (Java/Spring)",
+        "emoji": "☕",
+        "role": "Java 21, Spring Boot 3.3, Kafka, MongoDB, WebFlux, JUnit",
+        "workspace": "~/.openclaw/workspace-backend",
+        "agentDir": "~/.openclaw/agents/backend/agent",
+        "model": "anthropic/claude-sonnet-4-6",
+        "resourceLimits": {
+          "memory": "4GB",
+          "cpu": "4",
+          "maxConcurrentTasks": 2
+        },
+        "tools": {
+          "allow": ["read", "write", "edit", "exec", "apply_patch"],
+          "deny": ["delete_outside_workspace"]
+        },
+        "skills": ["github", "exa-search", "file-ops", "docker", "maven"]
+      },
+      {
+        "id": "frontend",
+        "name": "⚛️ Frontend Dev (React)",
+        "emoji": "⚛️",
+        "role": "React 18, TypeScript, Tailwind, Vite, Vitest, Playwright",
+        "workspace": "~/.openclaw/workspace-frontend",
+        "agentDir": "~/.openclaw/agents/frontend/agent",
+        "model": "google/gemini-3-flash",
+        "thinking": "anthropic/claude-sonnet-4-6",
+        "resourceLimits": {
+          "memory": "3GB",
+          "cpu": "3",
+          "maxConcurrentTasks": 2
+        },
+        "tools": {
+          "allow": ["read", "write", "edit", "exec", "apply_patch"],
+          "deny": ["delete_outside_workspace"]
+        },
+        "skills": ["github", "exa-search", "file-ops", "npm", "frontend-design"]
+      },
+      {
+        "id": "qa",
+        "name": "🧪 QA Engineer",
+        "emoji": "🧪",
+        "role": "Test generation (JUnit, Testcontainers, Vitest, Playwright), code review",
+        "workspace": "~/.openclaw/workspace-qa",
+        "agentDir": "~/.openclaw/agents/qa/agent",
+        "model": "ollama/gemma4:26b",
+        "fallback": ["ollama/llama2:7b", "google/gemini-2.0-flash"],
+        "resourceLimits": {
+          "memory": "6GB",
+          "cpu": "6",
+          "maxConcurrentTasks": 3
+        },
+        "tools": {
+          "allow": ["read", "write", "edit", "exec"],
+          "deny": ["apply_patch", "delete"]
+        },
+        "skills": ["github", "file-ops", "testing"]
+      },
+      {
+        "id": "devops",
+        "name": "☁️ DevOps (GCP)",
+        "emoji": "☁️",
+        "role": "Docker, GKE, Cloud Run, Cloud Build, Terraform, CI/CD",
+        "workspace": "~/.openclaw/workspace-devops",
+        "agentDir": "~/.openclaw/agents/devops/agent",
+        "model": "google/gemini-3-flash",
+        "thinking": "anthropic/claude-sonnet-4-6",
+        "resourceLimits": {
+          "memory": "2GB",
+          "cpu": "2",
+          "maxConcurrentTasks": 1
+        },
+        "tools": {
+          "allow": ["read", "write", "edit", "exec"],
+          "deny": ["apply_patch_to_prod"]
+        },
+        "skills": ["docker", "gcloud", "terraform", "github-actions"]
+      }
+    ]
+  },
+
+  "bindings": [
+    {
+      "agentId": "orchestrator",
+      "match": { "channel": "telegram", "accountId": "main" }
+    },
+    {
+      "agentId": "backend",
+      "match": { "channel": "telegram", "peer": "backend-chat" }
+    },
+    {
+      "agentId": "frontend",
+      "match": { "channel": "telegram", "peer": "frontend-chat" }
+    },
+    {
+      "agentId": "qa",
+      "match": { "channel": "telegram", "peer": "qa-chat" }
+    },
+    {
+      "agentId": "devops",
+      "match": { "channel": "telegram", "peer": "devops-chat" }
+    }
+  ],
+
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "botToken": "$TELEGRAM_BOT_TOKEN",
+      "rateLimit": {
+        "messagesPerMin": 30
+      }
+    }
+  },
+
+  "sandbox": {
+    "mode": "orbstack",
+    "containerRuntime": "orbstack",
+    "orbstackOptimizations": {
+      "enabled": true,
+      "nativeARM": true,
+      "rosettaDisabled": true,
+      "vncDisabled": true,
+      "maxParallelAgents": 4,
+      "flexibleMemory": true,
+      "improvedNetworking": true,
+      "betterFileIO": true
+    },
+    "macStudioOptimizations": {
+      "maxParallelAgents": 4,
+      "ollamaMemory": "16GB",
+      "gpuAcceleration": true,
+      "swapReduction": true,
+      "memoryStrategy": "efficient"
+    },
+    "allowedPaths": [
+      "~/projects",
+      "~/.openclaw/workspace-orchestrator",
+      "~/.openclaw/workspace-backend",
+      "~/.openclaw/workspace-frontend",
+      "~/.openclaw/workspace-qa",
+      "~/.openclaw/workspace-devops"
+    ],
+    "orbstackResourceLimits": {
+      "vmMemory": "12GB",
+      "cpus": "8",
+      "diskSpace": "100GB"
+    },
+    "dockerResourceLimits": {
+      "memory": "12GB",
+      "cpus": "8",
+      "diskSpace": "100GB"
+    },
+    "_comment_memory_budget": "Total 36GB: macOS 4GB + reserve 1GB + OrbStack 12GB + Ollama 16GB + headroom ~3GB = perfect fit"
+  },
+
+  "monitoring": {
+    "enabled": true,
+    "metricsInterval": "30s",
+    "logRetention": "7d",
+    "alerting": {
+      "highMemoryUsage": { "threshold": "85%", "action": "warn" },
+      "ollamaLatency": { "threshold": "5000ms", "action": "fallback" },
+      "apiRateLimitApproach": { "threshold": "80%", "action": "throttle" },
+      "orbstackVMPressure": { "threshold": "80%", "action": "warn" }
+    }
+  },
+
+  "costTracking": {
+    "enabled": true,
+    "budgets": {
+      "anthropic": { "dailyBudget": 20, "monthlyBudget": 30 },
+      "google": { "dailyBudget": 15, "monthlyBudget": 50 }
+    },
+    "alerts": {
+      "enabled": true,
+      "channels": ["telegram", "log"]
+    }
+  }
+}
+
