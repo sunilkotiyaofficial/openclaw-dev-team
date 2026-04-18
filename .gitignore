@@ -1,0 +1,126 @@
+# ═════════════════════════════════════════════════════════════
+# OpenClaw Dev Team — .gitignore
+# ═════════════════════════════════════════════════════════════
+# Excludes OS noise, IDE files, agent runtime state, secrets,
+# and build artifacts for all languages our agents may generate.
+# ═════════════════════════════════════════════════════════════
+
+
+# ─── OS-level noise ──────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+
+# ─── IDE / Editor ────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+
+# ─── OpenClaw runtime state (regenerated each session) ───────
+.openclaw/
+workspace-*/.openclaw/
+workspace-*/memory/
+workspace-*/sessions/
+workspace-*/.sessions/
+*.openclaw.log
+
+
+# ─── Secrets & credentials (NEVER commit these) ──────────────
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+gcp-key*.json
+aws-credentials
+secrets/
+.secrets/
+
+
+# ─── Java / Maven / Gradle (backend agent output) ────────────
+target/
+build/
+.gradle/
+!gradle-wrapper.jar
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+dependency-reduced-pom.xml
+hs_err_pid*
+
+
+# ─── Node / React / TypeScript (frontend agent output) ───────
+node_modules/
+dist/
+.next/
+.nuxt/
+.parcel-cache/
+.turbo/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+
+# ─── Python (just in case for tooling / scripts) ─────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+
+# ─── Docker / containers ─────────────────────────────────────
+docker-compose.override.yml
+*.pid
+
+
+# ─── Terraform (devops agent output) ─────────────────────────
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+crash.log
+
+
+# ─── Logs ────────────────────────────────────────────────────
+*.log
+logs/
+
+
+# ─── Temp / misc ─────────────────────────────────────────────
+*.tmp
+*.bak
+.cache/
