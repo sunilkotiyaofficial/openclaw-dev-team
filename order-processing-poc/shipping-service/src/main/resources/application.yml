@@ -1,0 +1,29 @@
+server:
+  port: ${SERVER_PORT:8084}
+spring:
+  application:
+    name: shipping-service
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://localhost:27020/shipments_db}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+        spring.json.trusted.packages: "com.example.*"
+        spring.json.use.type.headers: false
+    producer:
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+kafka:
+  topics:
+    replication-factor: 1

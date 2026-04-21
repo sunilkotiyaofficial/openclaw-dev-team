@@ -1,0 +1,13 @@
+package com.example.order.model;
+
+public enum OrderStatus {
+    PENDING,
+    PAYMENT_PROCESSING,
+    INVENTORY_RESERVING,
+    SHIPPING_SCHEDULED,
+    COMPLETED,
+    CANCELLED,
+    PAYMENT_FAILED,
+    INVENTORY_FAILED,
+    SHIPPING_FAILED
+}
