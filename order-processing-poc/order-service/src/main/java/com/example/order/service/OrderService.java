@@ -68,7 +68,7 @@ public class OrderService {
                     );
                     var envelope = EventEnvelope.root(EventType.OrderCreated.name(), saved.getId(), payload);
 
-                    return Mono.fromCompletableFuture(
+                    return Mono.fromFuture(
                             eventPublisher.publish(KafkaTopicNames.ORDER_LIFECYCLE, saved.getId(), envelope)
                     ).thenReturn(saved);
                 })
@@ -127,7 +127,7 @@ public class OrderService {
         return sink.asFlux()
                 .doFinally(signal -> {
                     // Clean up sink if no more subscribers
-                    if (!sink.currentSubscriberCount().equals(0)) return;
+                    if (sink.currentSubscriberCount() != 0) return;
                     orderSinks.remove(orderId);
                 });
     }

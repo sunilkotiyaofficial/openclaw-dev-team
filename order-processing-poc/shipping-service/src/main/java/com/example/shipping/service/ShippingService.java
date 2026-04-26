@@ -72,12 +72,6 @@ public class ShippingService {
 
         return shipmentRepository.save(shipment)
                 .flatMap(saved -> {
-                    ShippingScheduledPayload.ShippingAddress evtAddr = addr != null
-                            ? new ShippingScheduledPayload.ShippingAddress(
-                                    addr.street(), addr.city(), addr.state(), addr.zip(), addr.country())
-                            : null;
-
-                    // Use local ShippingAddress record - need to import from payload
                     var payloadAddr = new OrderCreatedPayload.ShippingAddress(
                         addr != null ? addr.street() : "",
                         addr != null ? addr.city() : "",
@@ -92,7 +86,7 @@ public class ShippingService {
                             saved.getPickupWarehouseId() != null ? saved.getPickupWarehouseId() : "WH-DEFAULT",
                             payloadAddr);
                     var envelope = EventEnvelope.causedBy(cause, EventType.ShippingScheduled.name(), payload);
-                    return Mono.fromCompletableFuture(
+                    return Mono.fromFuture(
                             eventPublisher.publish(KafkaTopicNames.SHIPPING_EVENTS, reservation.orderId(), envelope))
                             .then();
                 });

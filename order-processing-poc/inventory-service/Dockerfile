@@ -8,6 +8,9 @@ COPY common-events/pom.xml common-events/
 COPY common-kafka/pom.xml common-kafka/
 COPY kafka-config/pom.xml kafka-config/
 COPY inventory-service/pom.xml inventory-service/
+COPY order-service/pom.xml order-service/
+COPY payment-service/pom.xml payment-service/
+COPY shipping-service/pom.xml shipping-service/
 
 # Download dependencies (cached layer)
 RUN mvn dependency:go-offline -pl inventory-service -am -q

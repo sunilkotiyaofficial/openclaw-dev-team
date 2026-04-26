@@ -80,7 +80,7 @@ public class InventoryService {
                         // Emit InventoryDepleted for compensation
                         var payload = new InventoryDepletedPayload(orderId, depleted, true);
                         var envelope = EventEnvelope.causedBy(cause, EventType.InventoryDepleted.name(), payload);
-                        return Mono.fromCompletableFuture(
+                        return Mono.fromFuture(
                                 eventPublisher.publish(KafkaTopicNames.INVENTORY_EVENTS, orderId, envelope))
                                 .then();
                     }
@@ -124,7 +124,7 @@ public class InventoryService {
                                                     orderId, reservationId, items, savedRes.getExpiresAt());
                                             var envelope = EventEnvelope.causedBy(cause,
                                                     EventType.InventoryReserved.name(), payload);
-                                            return Mono.fromCompletableFuture(
+                                            return Mono.fromFuture(
                                                     eventPublisher.publish(KafkaTopicNames.INVENTORY_EVENTS, orderId, envelope))
                                                     .then();
                                         });

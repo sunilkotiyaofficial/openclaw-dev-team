@@ -61,7 +61,7 @@ public class PaymentService {
                                         EventType.PaymentCompleted.name(), completedPayload);
 
                                 return paymentRepository.save(saved)
-                                        .flatMap(s -> Mono.fromCompletableFuture(
+                                        .flatMap(s -> Mono.fromFuture(
                                                 eventPublisher.publish(KafkaTopicNames.PAYMENT_EVENTS, s.getOrderId(), envelope))
                                                 .thenReturn(s));
                             } else {
@@ -76,7 +76,7 @@ public class PaymentService {
                                         EventType.PaymentFailed.name(), failedPayload);
 
                                 return paymentRepository.save(saved)
-                                        .flatMap(s -> Mono.fromCompletableFuture(
+                                        .flatMap(s -> Mono.fromFuture(
                                                 eventPublisher.publish(KafkaTopicNames.PAYMENT_EVENTS, s.getOrderId(), envelope))
                                                 .thenReturn(s));
                             }
