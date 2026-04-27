@@ -1,0 +1,40 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: camel-eip-demo
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+camel:
+  springboot:
+    name: camel-eip-demo
+  main:
+    name: camel-eip-demo
+
+# AWS S3 (LocalStack endpoint for local dev)
+aws:
+  s3:
+    data-lake-bucket: ${S3_BUCKET:data-lake}
+    access-key: ${AWS_ACCESS_KEY:test}
+    secret-key: ${AWS_SECRET_KEY:test}
+    region: ${AWS_REGION:us-east-1}
+    endpoint: ${AWS_ENDPOINT:http://localhost:4566}
+
+# Actuator exposure for ops
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,camelroutes
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    com.example.camel: DEBUG
+    org.apache.camel: INFO

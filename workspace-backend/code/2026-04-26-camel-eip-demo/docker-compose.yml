@@ -1,0 +1,71 @@
+services:
+  # ─── Kafka (KRaft mode — no ZooKeeper) ──────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: kafka-camel
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qg
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 90s
+
+  # ─── Kafka UI for debugging ─────────────────────────────────────
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    container_name: kafdrop-camel
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: kafka:29092
+      JVM_OPTS: "-Xms32M -Xmx64M"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # ─── LocalStack — emulates AWS S3 locally ───────────────────────
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack-camel
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3
+      DEBUG: "1"
+      DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./.localstack:/var/lib/localstack"
+
+  # ─── One-shot init: create the S3 bucket on startup ─────────────
+  bucket-init:
+    image: amazon/aws-cli:latest
+    container_name: bucket-init
+    depends_on:
+      - localstack
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: >
+      sh -c "
+      sleep 5;
+      aws --endpoint-url=http://localstack:4566 s3 mb s3://data-lake;
+      echo 'Bucket created: s3://data-lake';
+      "
