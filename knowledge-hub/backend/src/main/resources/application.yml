@@ -1,0 +1,147 @@
+server:
+  port: 8080
+  # Java 21 Virtual Threads as Tomcat executor — handles thousands of
+  # concurrent connections with simple imperative code style
+  tomcat:
+    threads:
+      max: 200          # platform threads (carrier pool)
+  # The `applicationTaskExecutor` bean (defined in main class) uses VTs
+
+spring:
+  application:
+    name: knowledge-hub
+  threads:
+    virtual:
+      enabled: true     # Spring Boot 3.2+ — opt-in to virtual threads everywhere
+
+  # ─── PostgreSQL (JPA) ────────────────────────────────────────────────
+  datasource:
+    url: jdbc:postgresql://localhost:5432/knowledge_hub
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+
+  jpa:
+    hibernate:
+      ddl-auto: update    # for demo — use 'validate' + Flyway in production
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        show_sql: false
+        # Statistics for n+1 detection
+        generate_statistics: true
+
+  # ─── MongoDB (Reactive) ──────────────────────────────────────────────
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/knowledge_notes
+      auto-index-creation: true
+
+# ─── Security: JWT configuration ───────────────────────────────────────
+# IMPORTANT: In production, load from Secret Manager / Vault, not yml.
+# Generate a real secret: openssl rand -base64 64
+security:
+  jwt:
+    # Base64-encoded HS256 secret (256 bits min). Demo value — REPLACE in prod!
+    secret-key: ${JWT_SECRET:c2VjcmV0LWtleS1mb3ItZGV2LW9ubHktbmV2ZXItdXNlLWluLXByb2QtcGxlYXNlLXJlcGxhY2UtbWVlZWVlZQ==}
+    access-token:
+      expiration-ms: 900000          # 15 minutes
+    refresh-token:
+      expiration-ms: 604800000       # 7 days
+
+# ─── Resilience4j configuration ────────────────────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      articleService:
+        registerHealthIndicator: true
+        slidingWindowSize: 20
+        failureRateThreshold: 50          # open circuit if 50% of last 20 fail
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
+  retry:
+    instances:
+      articleService:
+        maxAttempts: 3
+        waitDuration: 500ms
+        exponentialBackoffMultiplier: 2.0
+
+  timelimiter:
+    instances:
+      articleService:
+        timeoutDuration: 2s
+        cancelRunningFuture: true
+
+  bulkhead:
+    instances:
+      articleService:
+        maxConcurrentCalls: 10
+        maxWaitDuration: 100ms
+
+# ─── Observability — Actuator endpoints + Prometheus + Tracing ────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers,resilience4j.circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true   # enables p50/p90/p99 histograms
+
+  tracing:
+    sampling:
+      probability: 1.0   # 100% sampling for dev — reduce in prod (e.g., 0.1)
+    propagation:
+      type: w3c           # standard W3C Trace Context
+
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+
+# ─── Logging — structured JSON for production ─────────────────────────
+logging:
+  level:
+    root: INFO
+    com.example.knowledgehub: DEBUG
+    org.hibernate.SQL: WARN
+    org.springframework.web: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# ─── Profile-specific overrides ───────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    show-sql: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+management:
+  tracing:
+    sampling:
+      probability: 0.1
