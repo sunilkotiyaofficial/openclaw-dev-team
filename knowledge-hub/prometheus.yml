@@ -1,0 +1,23 @@
+# Prometheus configuration for Knowledge Hub local dev
+# Scrapes Spring Boot actuator metrics every 15 seconds
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus monitors itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Knowledge Hub backend — Spring Boot Actuator
+  # host.docker.internal resolves to the host machine from inside Docker
+  - job_name: 'knowledge-hub-backend'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+        labels:
+          application: 'knowledge-hub'
+          environment: 'dev'
