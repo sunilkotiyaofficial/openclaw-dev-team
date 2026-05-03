@@ -1,21 +1,13 @@
 package com.example.knowledgehub.security;
 
-import com.example.knowledgehub.repository.jpa.UserRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -25,8 +17,12 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 /**
- * Spring Security 6 configuration — JWT-based stateless authentication
- * with Role-Based Authorization.
+ * Spring Security 6 filter chain configuration.
+ *
+ * <p><b>Stripped down responsibility</b>: This class only configures the
+ * security filter chain + CORS. Authentication beans (UserDetailsService,
+ * PasswordEncoder, AuthenticationProvider, AuthenticationManager) live in
+ * {@link ApplicationConfig} to avoid circular dependencies.</p>
  *
  * <p><b>Key design decisions:</b></p>
  * <ul>
@@ -34,7 +30,6 @@ import java.util.List;
  *   <li>CSRF disabled — only relevant for cookie-based sessions</li>
  *   <li>JWT filter inserted BEFORE UsernamePasswordAuthenticationFilter</li>
  *   <li>{@code @EnableMethodSecurity} — enables {@code @PreAuthorize} on methods</li>
- *   <li>BCrypt for password hashing (12 rounds — production-safe)</li>
  * </ul>
  *
  * <p><b>Interview talking point — stateless vs stateful:</b></p>
@@ -50,12 +45,12 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
-    private final UserRepository userRepository;
+    private final AuthenticationProvider authenticationProvider;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
-                          UserRepository userRepository) {
+                          AuthenticationProvider authenticationProvider) {
         this.jwtAuthFilter = jwtAuthFilter;
-        this.userRepository = userRepository;
+        this.authenticationProvider = authenticationProvider;
     }
 
     @Bean
@@ -72,6 +67,7 @@ public class SecurityConfig {
                         // Public endpoints — no auth required
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/prometheus").permitAll()  // for metrics scraping
 
                         // Read-only — any authenticated user (USER, EDITOR, ADMIN)
                         .requestMatchers(HttpMethod.GET, "/api/topics/**", "/api/notes/**", "/api/resources/**")
@@ -94,54 +90,13 @@ public class SecurityConfig {
                 // Stateless — every request must carry credentials (JWT)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // Wire our DAO authentication provider (uses UserDetailsService + PasswordEncoder)
-                .authenticationProvider(authenticationProvider())
+                // Wire our DAO authentication provider (from ApplicationConfig)
+                .authenticationProvider(authenticationProvider)
 
                 // Insert JWT filter BEFORE Spring's standard form login filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
-
-    /**
-     * Custom UserDetailsService — looks up users by username from JPA repository.
-     * Spring Security calls this during authentication.
-     */
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return username -> userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
-    }
-
-    /**
-     * BCrypt password encoder — strength 12.
-     *
-     * <p>Strength = work factor (2^12 iterations). Higher = more secure but slower.
-     * 12 is the production recommendation as of 2024 — takes ~250ms per hash on
-     * modern hardware, infeasible for offline brute-force.</p>
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
-    }
-
-    /**
-     * AuthenticationProvider — wires UserDetailsService + PasswordEncoder
-     * for Spring Security to authenticate username/password against DB.
-     */
-    @Bean
-    public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService());
-        authProvider.setPasswordEncoder(passwordEncoder());
-        return authProvider;
-    }
-
-    /** Exposes the AuthenticationManager bean — needed by AuthController. */
-    @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
     }
 
     /** CORS — allows React frontend (localhost:3000) to call this API. */

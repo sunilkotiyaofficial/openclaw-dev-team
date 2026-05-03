@@ -2,14 +2,13 @@ package com.example.knowledgehub.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,7 +18,7 @@ import java.util.stream.Collectors;
 /**
  * JWT generation, parsing, and validation service.
  *
- * <p>Uses {@code jjwt} library (the de-facto Java JWT library).
+ * <p>Uses {@code jjwt} library 0.12.x (current API).
  * Algorithm: HS256 (HMAC-SHA256) — symmetric key. For inter-service
  * verification, prefer asymmetric (RS256) where issuer signs with private
  * key and consumers verify with public key.</p>
@@ -74,16 +73,29 @@ public class JwtService {
         return buildToken(new HashMap<>(), userDetails, refreshTokenExpirationMs);
     }
 
+    /**
+     * Build a JWT using the jjwt 0.12.x fluent API.
+     *
+     * <p>Notice the modern API:
+     * <ul>
+     *   <li>{@code .claims(map)} replaces {@code .setClaims(map)}</li>
+     *   <li>{@code .subject(s)} replaces {@code .setSubject(s)}</li>
+     *   <li>{@code .issuedAt()}, {@code .expiration()}, {@code .issuer()}</li>
+     *   <li>{@code .signWith(key, Jwts.SIG.HS256)} replaces {@code SignatureAlgorithm.HS256}</li>
+     * </ul>
+     * </p>
+     */
     private String buildToken(Map<String, Object> extraClaims,
                               UserDetails userDetails,
                               long expirationMs) {
+        long now = System.currentTimeMillis();
         return Jwts.builder()
-                .setClaims(extraClaims)
-                .setSubject(userDetails.getUsername())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
-                .setIssuer("knowledge-hub")
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .claims(extraClaims)
+                .subject(userDetails.getUsername())
+                .issuedAt(new Date(now))
+                .expiration(new Date(now + expirationMs))
+                .issuer("knowledge-hub")
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
@@ -102,12 +114,25 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
+    /**
+     * Parse and validate a token using jjwt 0.12.x API.
+     *
+     * <p>The new flow:
+     * <ul>
+     *   <li>{@code Jwts.parser()} replaces {@code Jwts.parserBuilder()}</li>
+     *   <li>{@code .verifyWith(key)} replaces {@code .setSigningKey(key)}</li>
+     *   <li>{@code .parseSignedClaims(token)} replaces {@code .parseClaimsJws(token)}</li>
+     *   <li>{@code .getPayload()} replaces {@code .getBody()}</li>
+     * </ul>
+     * Will throw if signature invalid, expired, or malformed.
+     * </p>
+     */
     private Claims extractAllClaims(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
                 .build()
-                .parseClaimsJws(token)        // throws if signature invalid
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
@@ -124,8 +149,13 @@ public class JwtService {
         return extractExpiration(token).before(new Date());
     }
 
-    private Key getSigningKey() {
-        // Decode Base64-encoded secret to byte array, build HMAC key
+    /**
+     * Derive the HMAC signing key from the Base64-encoded secret.
+     *
+     * <p>Returns SecretKey (modern type) instead of generic Key —
+     * matches jjwt 0.12.x API expectations.</p>
+     */
+    private SecretKey getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);
     }
