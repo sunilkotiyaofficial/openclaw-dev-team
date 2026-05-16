@@ -57,7 +57,9 @@ public class TopicController {
         topicService.delete(id);
     }
 
-    /** Async endpoint — runs on virtual thread executor. */
+    /**
+     * Async endpoint — runs on virtual thread executor.
+     */
     @PostMapping("/{category}/mark-mastered-async")
     public CompletableFuture<ResponseEntity<String>> bulkMarkMasteredAsync(
             @PathVariable com.example.knowledgehub.domain.jpa.Category category) {
